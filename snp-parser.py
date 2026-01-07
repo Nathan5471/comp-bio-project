@@ -8,10 +8,19 @@ def parseSnpFile():
         SNPs = {}
         Genes = {}
         for row in reader:
-            if index == 0 or index == 1 or index == 2:
-                print(row)
+            snpData = row["SNPS"].split(", ")
+            for snp in snpData:
+                SNPs[snp] = SNPs[snp] + 1 if snp in SNPs else 1
+            geneData = row["REPORTED GENE(S)"].split(", ")
+            for gene in geneData:
+                Genes[gene] = Genes[gene] + 1 if gene in Genes else 1
             index += 1
-        print(len(reader))
+    filteredSNPs = {k: v for k, v in SNPs.items() if v > 1}
+    filteredGenes = {k: v for k, v in Genes.items() if v > 1}
+    print("SNPs found in multiple associations:", filteredSNPs)
+    print("Length:", len(filteredSNPs))
+    print("Genes found in multiple associations:", filteredGenes)
+    print("Length:", len(filteredGenes))
 
 
 parseSnpFile()
