@@ -17,6 +17,12 @@ def parseSnpFile():
             index += 1
     filteredSNPs = {k: v for k, v in SNPs.items() if v > 1}
     filteredGenes = {k: v for k, v in Genes.items() if v > 1}
+    with open("snp.txt", "w") as snpFile:
+        for snp in filteredSNPs:
+            snpFile.write(snp + "\n")
+    with open("gene.txt", "w") as geneFile:
+        for gene in filteredGenes:
+            geneFile.write(gene + "\n")
     print("SNPs found in multiple associations:", filteredSNPs)
     print("Length:", len(filteredSNPs))
     print("Genes found in multiple associations:", filteredGenes)
