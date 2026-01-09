@@ -1,3 +1,5 @@
 venv
 gene.txt
 snp.txt
+tfs.txt
+impacted-genes.txt
