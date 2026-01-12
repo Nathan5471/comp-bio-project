@@ -4,3 +4,5 @@ snp.txt
 tfs.txt
 impacted-genes.txt
 all-tfs.tsv
+geo2r/*
+diffGenes.txt

@@ -1,4 +1,6 @@
 import csv
+import os
+import json
 
 
 def parseSnpFile():
@@ -49,11 +51,30 @@ def compareGenesToTfs():
     print(f"Found {len(commonGenes)} TFs in the gene list out of {index} total TFs.")
 
 
+def parseDiffGenes():
+    diffStudies = os.listdir("geo2r")
+    results = {}
+    for study in diffStudies:
+        print("Current Study:", study)
+        with open(os.path.join("geo2r", study)) as file:
+            reader = csv.DictReader(file, delimiter="\t")
+            for row in reader:
+                gene = None
+                if row.keys().__contains__("Symbol"):
+                    gene = row["Symbol"]
+                elif row.keys().__contains__("Gene.symbol"):
+                    gene = row["Gene.symbol"]
+                if gene:
+                    results[study] = results.get(study, []) + [gene]
+    with open("diffGenes.txt", "w") as outputFile:
+        json.dump(results, outputFile)
+    print(f"Parsed differentially expressed genes from {len(diffStudies)} studies.")
+
+
 def compareDiffGeneToTfs():  # Compare the differently expressed genes to the TFs that were impacted by the SNPs
-    diffGenes = set()
-    with open("gene.txt") as geneFile:
-        for line in geneFile:
-            diffGenes.add(line.strip())
+    diffGenes = None
+    with open("diffGenes.txt") as geneFile:
+        diffGenes = json.load(geneFile)
     tfs = set()
     with open("tfs.txt") as tfFile:
         for line in tfFile:
@@ -70,16 +91,19 @@ def compareDiffGeneToTfs():  # Compare the differently expressed genes to the TF
             index += 1
             if (index % 100000) == 0:
                 print(f"Processed {index} TF entries.")
-    impactedGenes = set()
-    for gene in diffGenes:
-        if any(gene in targets for targets in tfDict.values()):
-            impactedGenes.add(gene)
-    print(f"Identified {len(impactedGenes)} impacted genes from the TFs.")
+    impactedGenes = {}
+    for study in diffGenes:
+        print("Current Study:", study)
+        print("Study data:", diffGenes[study])
+        for gene in diffGenes[study]:
+            if any(gene in tfDict[tf] for tf in tfDict):
+                impactedGenes[study] = impactedGenes.get(study, []) + [gene]
+    print(f"Identified {len(impactedGenes.values())} impacted genes from the TFs.")
     with open("impacted-genes.txt", "w") as outputFile:
-        for gene in impactedGenes:
-            outputFile.write(gene + "\n")
+        json.dump(impactedGenes, outputFile)
 
 
 parseSnpFile()
 compareGenesToTfs()
+parseDiffGenes()
 compareDiffGeneToTfs()
