@@ -1,6 +1,12 @@
 import csv
 import os
 import json
+import time
+from Bio import Entrez
+from dotenv import load_dotenv
+
+
+load_dotenv()
 
 
 def parseSnpFile():
@@ -35,75 +41,118 @@ def compareGenesToTfs():
     with open("gene.txt") as geneFile:
         for line in geneFile:
             genes.add(line.strip())
-    tfs = set()
+    tfs = {}
     with open("all-tfs.tsv") as tfFile:
         reader = csv.DictReader(tfFile, delimiter="\t")
         index = 0
         for row in reader:
-            tfs.add(row["Name.TF"])
+            tf = row["Name.TF"]
+            if tf in genes:
+                tfs[tf] = tfs.get(tf, []) + [row["Name.Target"]]
             index += 1
             if (index % 100000) == 0:
                 print(f"Processed {index} TF entries.")
     commonGenes = genes.intersection(tfs)
     with open("tfs.txt", "w") as outputFile:
-        for gene in commonGenes:
-            outputFile.write(gene + "\n")
+        json.dump(tfs, outputFile)
     print(f"Found {len(commonGenes)} TFs in the gene list out of {index} total TFs.")
 
 
-def parseDiffGenes():
-    diffStudies = os.listdir("geo2r")
-    results = {}
-    for study in diffStudies:
-        print("Current Study:", study)
-        with open(os.path.join("geo2r", study)) as file:
-            reader = csv.DictReader(file, delimiter="\t")
-            for row in reader:
-                gene = None
-                if row.keys().__contains__("Symbol"):
-                    gene = row["Symbol"]
-                elif row.keys().__contains__("Gene.symbol"):
-                    gene = row["Gene.symbol"]
-                if gene:
-                    results[study] = results.get(study, []) + [gene]
-    with open("diffGenes.txt", "w") as outputFile:
-        json.dump(results, outputFile)
-    print(f"Parsed differentially expressed genes from {len(diffStudies)} studies.")
-
-
-def compareDiffGeneToTfs():  # Compare the differently expressed genes to the TFs that were impacted by the SNPs
-    diffGenes = None
-    with open("diffGenes.txt") as geneFile:
-        diffGenes = json.load(geneFile)
-    tfs = set()
-    with open("tfs.txt") as tfFile:
-        for line in tfFile:
-            tfs.add(line.strip())
-    tfDict = {}
-    with open("all-tfs.tsv") as tfFile:
-        reader = csv.DictReader(tfFile, delimiter="\t")
+def analyzeGeoData(fileName: str):
+    geoData = []
+    with open(f"geo2r/{fileName}") as geoFile:
+        reader = csv.DictReader(geoFile, delimiter="\t")
+        pValueTag = None
+        adjPValueTag = None
+        if "p.value" in reader.fieldnames:
+            pValueTag = "p.value"
+            adjPValueTag = "adj.p.value"
+        elif "P.value" in reader.fieldnames:
+            pValueTag = "P.value"
+            adjPValueTag = "adj.P.value"
+        elif "P.Value" in reader.fieldnames:
+            pValueTag = "P.Value"
+            if "adj.P.Value" in reader.fieldnames:
+                adjPValueTag = "adj.P.Value"
+            elif "adj.P.Val" in reader.fieldnames:
+                adjPValueTag = "adj.P.Val"
+        elif "pvalue" in reader.fieldnames:
+            pValueTag = "pvalue"
+            adjPValueTag = "padj"
+        else:
+            print("No recognizable p-value fields found:", reader.fieldnames)
+            return
         index = 0
         for row in reader:
-            if row["Name.TF"] in tfs:
-                tfDict[row["Name.TF"]] = tfDict.get(row["Name.TF"], []) + [
-                    row["Name.Target"]
-                ]
+            if (row[pValueTag] != "NA" and float(row[pValueTag]) < 0.05) and (
+                row[adjPValueTag] != "NA" and float(row[adjPValueTag]) < 0.05
+            ):
+                geneSymbol = row["Symbol"]
+                if geneSymbol and not geneSymbol in geoData:
+                    geoData.append(geneSymbol)
             index += 1
-            if (index % 100000) == 0:
-                print(f"Processed {index} TF entries.")
-    impactedGenes = {}
-    for study in diffGenes:
-        print("Current Study:", study)
-        print("Study data:", diffGenes[study])
-        for gene in diffGenes[study]:
-            if any(gene in tfDict[tf] for tf in tfDict):
-                impactedGenes[study] = impactedGenes.get(study, []) + [gene]
-    print(f"Identified {len(impactedGenes.values())} impacted genes from the TFs.")
-    with open("impacted-genes.txt", "w") as outputFile:
-        json.dump(impactedGenes, outputFile)
+            if (index % 10000) == 0:
+                print(f"Processed {index} GEO entries.")
+    print(f"Total significant GEO entries: {len(geoData)}")
+    tfData = None
+    with open("tfs.txt") as tfFile:
+        tfData: dict = json.load(tfFile)
+    if tfData is None:
+        print("TF data not found.")
+        return
+    impactedTfs = {}
+    for gene in geoData:
+        for tf in tfData:
+            if gene in tfData[tf]:
+                currentGeneList = impactedTfs.get(tf, [])
+                if gene not in currentGeneList:
+                    impactedTfs[tf] = impactedTfs.get(tf, []) + [gene]
+    with open(f"output/impacted-genes-{fileName}.txt", "w") as outputFile:
+        json.dump(impactedTfs, outputFile)
 
 
-parseSnpFile()
-compareGenesToTfs()
-parseDiffGenes()
-compareDiffGeneToTfs()
+def findGeneData(fileName: str):
+    genes = set()
+    with open(f"output/{fileName}") as geneFile:
+        data = json.load(geneFile)
+        for tf in data:
+            for gene in data[tf]:
+                if gene not in genes:
+                    genes.add(gene)
+    print(f"Total unique genes found: {len(genes)}")
+    Entrez.email = os.getenv("email", "")
+
+    geneInfo = {}
+    for gene in genes:
+        handle = Entrez.esearch(db="gene", term=f"{gene}[Gene Name]", retmode="xml")
+        record = Entrez.read(handle)
+        handle.close()
+        print(f"Searching for gene: {gene}, found {record['Count']} entries.")
+        time.sleep(0.34)  # 3/second rate limit
+        if not record["IdList"]:
+            continue
+        geneId = record["IdList"][0]
+        handle = Entrez.esummary(db="gene", id=geneId, retmode="xml")
+        records = Entrez.read(handle)
+        handle.close()
+        summary = records["DocumentSummarySet"]["DocumentSummary"][0]["Summary"]
+        geneInfo[gene] = summary
+        time.sleep(0.34)  # 3/second rate limit
+    with open(f"output/gene-data-{fileName}", "w") as outputFile:
+        json.dump(geneInfo, outputFile)
+
+
+if not os.path.exists("snp.txt") and not os.path.exists(
+    "gene.txt"
+):  # Skip if already done to save time
+    parseSnpFile()
+if not os.path.exists("tfs.txt"):
+    compareGenesToTfs()
+for fileName in os.listdir("geo2r"):
+    if fileName.endswith(".tsv"):
+        print(f"Analyzing GEO data file: {fileName}")
+        analyzeGeoData(fileName)
+for fileName in os.listdir("output"):
+    if fileName.startswith("impacted-genes-") and fileName.endswith(".txt"):
+        print(f"Finding gene data in file: {fileName}")
+        findGeneData(fileName)
