@@ -121,14 +121,19 @@ def findGeneData(fileName: str):
                     genes.add(gene)
     print(f"Total unique genes found: {len(genes)}")
     Entrez.email = os.getenv("email", "")
+    Entrez.api_key = os.getenv("api", "")
+    Entrez.sleep_between_tries = 0.2  # 5/second rate limit
 
     geneInfo = {}
     for gene in genes:
-        handle = Entrez.esearch(db="gene", term=f"{gene}[Gene Name]", retmode="xml")
+        handle = Entrez.esearch(
+            db="gene",
+            term=f"{gene}[Gene Name] AND Homo sapiens[Organism]",
+            retmode="xml",
+        )
         record = Entrez.read(handle)
         handle.close()
         print(f"Searching for gene: {gene}, found {record['Count']} entries.")
-        time.sleep(0.34)  # 3/second rate limit
         if not record["IdList"]:
             continue
         geneId = record["IdList"][0]
@@ -137,9 +142,31 @@ def findGeneData(fileName: str):
         handle.close()
         summary = records["DocumentSummarySet"]["DocumentSummary"][0]["Summary"]
         geneInfo[gene] = summary
-        time.sleep(0.34)  # 3/second rate limit
     with open(f"output/gene-data-{fileName}", "w") as outputFile:
         json.dump(geneInfo, outputFile)
+
+
+def checkBrainRelation(fileName: str):
+    approvedData = {}
+    data = None
+    with open(f"output/{fileName}") as inputFile:
+        data = json.load(inputFile)
+    if not data:
+        return
+    for gene in data:
+        print("Gene Name:", gene)
+        print(data[gene])
+        while True:
+            response = input("Is this gene related to brain function? (y/n): ")
+            if response.lower() == "y":
+                approvedData[gene] = data[gene]
+                break
+            elif response.lower() == "n":
+                break
+            else:
+                print("Please input 'y' or 'n'.")
+    with open(f"diffGenes-{fileName}", "w") as outputFile:
+        json.dump(approvedData, outputFile)
 
 
 if not os.path.exists("snp.txt") and not os.path.exists(
@@ -149,10 +176,20 @@ if not os.path.exists("snp.txt") and not os.path.exists(
 if not os.path.exists("tfs.txt"):
     compareGenesToTfs()
 for fileName in os.listdir("geo2r"):
-    if fileName.endswith(".tsv"):
+    if fileName.endswith(".tsv") and not os.path.exists(
+        f"output/impacted-genes-{fileName}.txt"
+    ):
         print(f"Analyzing GEO data file: {fileName}")
         analyzeGeoData(fileName)
 for fileName in os.listdir("output"):
-    if fileName.startswith("impacted-genes-") and fileName.endswith(".txt"):
+    if (
+        fileName.startswith("impacted-genes-")
+        and fileName.endswith(".txt")
+        and not os.path.exists(f"output/gene-data-{fileName}")
+    ):
         print(f"Finding gene data in file: {fileName}")
         findGeneData(fileName)
+for fileName in os.listdir("output"):
+    if fileName.startswith("gene-data-") and fileName.endswith(".txt"):
+        print(f"Checking brain relation for file: {fileName}")
+        checkBrainRelation(fileName)
