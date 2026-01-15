@@ -180,6 +180,11 @@ def checkBrainRelation(fileName: str, save=False):
                 quit()
             else:
                 print("Please input 'y' or 'n'.")
+        print("")
+        print("")
+        print("--------------------------------")
+        print("")
+        print("")
         index += 1
     with open(f"diffGenes-{fileName}", "w") as outputFile:
         json.dump(approvedData, outputFile)
