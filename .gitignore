@@ -6,5 +6,6 @@ impacted-genes.txt
 all-tfs.tsv
 geo2r/*
 output/*
+saves/*
 diffGenes.txt
 .env

@@ -146,14 +146,24 @@ def findGeneData(fileName: str):
         json.dump(geneInfo, outputFile)
 
 
-def checkBrainRelation(fileName: str):
+def checkBrainRelation(fileName: str, save=False):
     approvedData = {}
     data = None
+    savedIndex = 0
     with open(f"output/{fileName}") as inputFile:
         data = json.load(inputFile)
+    if save:
+        with open(f"saves/{fileName}.txt") as saveFile:
+            savedData = json.load(saveFile)
+            approvedData = savedData["data"]
+            savedIndex = savedData["index"]
     if not data:
         return
+    index = 0
     for gene in data:
+        if save and index < savedIndex:
+            index += 1
+            continue
         print("Gene Name:", gene)
         print(data[gene])
         while True:
@@ -163,8 +173,14 @@ def checkBrainRelation(fileName: str):
                 break
             elif response.lower() == "n":
                 break
+            elif response.lower() == "save":
+                with open(f"saves/{fileName}.txt", "w") as saveFile:
+                    json.dump({"data": approvedData, "index": index}, saveFile)
+                print(f"Progress saved at index {index}.")
+                quit()
             else:
                 print("Please input 'y' or 'n'.")
+        index += 1
     with open(f"diffGenes-{fileName}", "w") as outputFile:
         json.dump(approvedData, outputFile)
 
@@ -192,4 +208,7 @@ for fileName in os.listdir("output"):
 for fileName in os.listdir("output"):
     if fileName.startswith("gene-data-") and fileName.endswith(".txt"):
         print(f"Checking brain relation for file: {fileName}")
-        checkBrainRelation(fileName)
+        if os.path.exists(f"saves/{fileName}.txt"):
+            checkBrainRelation(fileName, save=True)
+        else:
+            checkBrainRelation(fileName)
