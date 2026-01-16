@@ -170,8 +170,16 @@ def checkBrainRelation(fileName: str, save=False):
             response = input("Is this gene related to brain function? (y/n): ")
             if response.lower() == "y":
                 approvedData[gene] = data[gene]
+                if index % 5 == 0:
+                    with open(f"saves/{fileName}.txt", "w") as saveFile:
+                        json.dump({"data": approvedData, "index": index}, saveFile)
+                    print(f"Progress saved at index {index}.")
                 break
             elif response.lower() == "n":
+                if index % 5 == 0:
+                    with open(f"saves/{fileName}.txt", "w") as saveFile:
+                        json.dump({"data": approvedData, "index": index}, saveFile)
+                    print(f"Progress saved at index {index}.")
                 break
             elif response.lower() == "save":
                 with open(f"saves/{fileName}.txt", "w") as saveFile:
