@@ -194,8 +194,18 @@ def checkBrainRelation(fileName: str, save=False):
         print("")
         print("")
         index += 1
-    with open(f"diffGenes-{fileName}", "w") as outputFile:
+    with open(f"output/diffGenes-{fileName}", "w") as outputFile:
         json.dump(approvedData, outputFile)
+
+
+def convertGeneDataToList(fileName: str):
+    data = None
+    with open(f"output/{fileName}") as dataFile:
+        data: dict = json.load(dataFile)
+    genes: list = data.keys()
+    with open(f"output/list-{fileName}", "w") as outputList:
+        outputList.write(",".join(genes))
+    print(f"Saved {len(genes)} genes")
 
 
 if not os.path.exists("snp.txt") and not os.path.exists(
@@ -218,10 +228,21 @@ for fileName in os.listdir("output"):
     ):
         print(f"Finding gene data in file: {fileName}")
         findGeneData(fileName)
+# for fileName in os.listdir("output"):
+#    if (
+#        fileName.startswith("gene-data-")
+#        and fileName.endswith(".txt")
+#        and not os.path.exists(f"output/diffGenes-{fileName}")
+#    ):
+#        print(f"Checking brain relation for file: {fileName}")
+#        if os.path.exists(f"saves/{fileName}.txt"):
+#            checkBrainRelation(fileName, save=True)
+#        else:
+#            checkBrainRelation(fileName)
 for fileName in os.listdir("output"):
-    if fileName.startswith("gene-data-") and fileName.endswith(".txt"):
-        print(f"Checking brain relation for file: {fileName}")
-        if os.path.exists(f"saves/{fileName}.txt"):
-            checkBrainRelation(fileName, save=True)
-        else:
-            checkBrainRelation(fileName)
+    if (
+        fileName.startswith("gene-data-")
+        and fileName.endswith(".txt")
+        and not os.path.exists(f"output/list-{fileName}")
+    ):
+        convertGeneDataToList(fileName)
