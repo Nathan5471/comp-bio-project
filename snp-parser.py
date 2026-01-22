@@ -1,12 +1,6 @@
 import csv
 import os
 import json
-import time
-from Bio import Entrez
-from dotenv import load_dotenv
-
-
-load_dotenv()
 
 
 def parseSnpFile():
@@ -111,7 +105,7 @@ def analyzeGeoData(fileName: str):
         json.dump(impactedTfs, outputFile)
 
 
-def findGeneData(fileName: str):
+def findGeneData(fileName: str):  # Only make a list, don't fetch summary
     genes = set()
     with open(f"output/{fileName}") as geneFile:
         data = json.load(geneFile)
@@ -120,92 +114,60 @@ def findGeneData(fileName: str):
                 if gene not in genes:
                     genes.add(gene)
     print(f"Total unique genes found: {len(genes)}")
-    Entrez.email = os.getenv("email", "")
-    Entrez.api_key = os.getenv("api", "")
-    Entrez.sleep_between_tries = 0.2  # 5/second rate limit
 
-    geneInfo = {}
-    for gene in genes:
-        handle = Entrez.esearch(
-            db="gene",
-            term=f"{gene}[Gene Name] AND Homo sapiens[Organism]",
-            retmode="xml",
-        )
-        record = Entrez.read(handle)
-        handle.close()
-        print(f"Searching for gene: {gene}, found {record['Count']} entries.")
-        if not record["IdList"]:
-            continue
-        geneId = record["IdList"][0]
-        handle = Entrez.esummary(db="gene", id=geneId, retmode="xml")
-        records = Entrez.read(handle)
-        handle.close()
-        summary = records["DocumentSummarySet"]["DocumentSummary"][0]["Summary"]
-        geneInfo[gene] = summary
-    with open(f"output/gene-data-{fileName}", "w") as outputFile:
-        json.dump(geneInfo, outputFile)
+    with open(f"output/list-{fileName}", "w") as outputFile:
+        json.dump(",".join(genes), outputFile)
 
 
-def checkBrainRelation(fileName: str, save=False):
-    approvedData = {}
-    data = None
-    savedIndex = 0
-    with open(f"output/{fileName}") as inputFile:
-        data = json.load(inputFile)
-    if save:
-        with open(f"saves/{fileName}.txt") as saveFile:
-            savedData = json.load(saveFile)
-            approvedData = savedData["data"]
-            savedIndex = savedData["index"]
-    if not data:
-        return
-    index = 0
-    for gene in data:
-        if save and index < savedIndex:
-            index += 1
-            continue
-        print("Gene Name:", gene)
-        print(data[gene])
-        while True:
-            response = input("Is this gene related to brain function? (y/n): ")
-            if response.lower() == "y":
-                approvedData[gene] = data[gene]
-                if index % 5 == 0:
-                    with open(f"saves/{fileName}.txt", "w") as saveFile:
-                        json.dump({"data": approvedData, "index": index}, saveFile)
-                    print(f"Progress saved at index {index}.")
-                break
-            elif response.lower() == "n":
-                if index % 5 == 0:
-                    with open(f"saves/{fileName}.txt", "w") as saveFile:
-                        json.dump({"data": approvedData, "index": index}, saveFile)
-                    print(f"Progress saved at index {index}.")
-                break
-            elif response.lower() == "save":
-                with open(f"saves/{fileName}.txt", "w") as saveFile:
-                    json.dump({"data": approvedData, "index": index}, saveFile)
-                print(f"Progress saved at index {index}.")
-                quit()
-            else:
-                print("Please input 'y' or 'n'.")
-        print("")
-        print("")
-        print("--------------------------------")
-        print("")
-        print("")
-        index += 1
-    with open(f"output/diffGenes-{fileName}", "w") as outputFile:
-        json.dump(approvedData, outputFile)
-
-
-def convertGeneDataToList(fileName: str):
-    data = None
-    with open(f"output/{fileName}") as dataFile:
-        data: dict = json.load(dataFile)
-    genes: list = data.keys()
-    with open(f"output/list-{fileName}", "w") as outputList:
-        outputList.write(",".join(genes))
-    print(f"Saved {len(genes)} genes")
+def identifyBrainGenes(fileName: str):
+    brainGenes = set()
+    with open(f"output/{fileName}") as geneFile:
+        data = json.load(geneFile)
+        brainGenes = data.replace('"', "").split(",")
+        if len(brainGenes) == 0 or (len(brainGenes) == 1 and brainGenes[0] == ""):
+            print("No genes found in the list.")
+            return
+    brainCategories = [
+        "GOBP_AMINO_ACID_NEUROTRANSMITTER_REUPTAKE",
+        "GOBP_ANTEROGRADE_DENRITIC_TRANSPORT_OF_NEUROTRANSMITTER_RECEPTOR_COMPLEX",
+        "GOBP_CALCIUM_ION_REGULATED_EXOCYTOSIS_OF_NEUROTRANSMITTER",
+        "GOBP_NEGATIVE_REGULATION_OF_NEUROTRANSMITTER_SECRETION",
+        "GOBP_NEGATIVE_REGULATION_OF_NEUROTRANSMITTER_TRANSPORT",
+        "GOBP_NEUROTRANSMITTER_GATED_ION_CHANNEL_CLUSTERING",
+        "GOBP_NEUROTRANSMITTER_LOADING_INTO_SYNAPTIC_VESICLE",
+        "GOBP_NEUROTRANSMITTER_RECEPTOR_INTERNALIZATION",
+        "GOBP_NEUROTRANSMITTER_RECEPTOR_LOCALIZATION_TO_POSTSYNAPTIC_SPECIALIZATION_MEMBRANE",
+        "GOBP_NEUROTRANSMITTER_RECEPTOR_TRANSPORT",
+        "GOBP_NEUROTRANSMITTER_RECEPTOR_TRANSPORT_ENDOSOME_TO_POSTSYNAPTIC_MEMBRANE",
+        "GOBP_NEUROTRANSMITTER_RECEPTOR_TRANSPORT_TO_PLASMA_MEMBRANE",
+        "GOBP_NEUROTRANSMITTER_REUPTAKE",
+        "GOBP_NEUROTRANSMITTER_SECRETION",
+        "GOBP_NEUROTRANSMITTER_TRANSPORT",
+        "GOBP_NEUROTRANSMITTER_UPTAKE",
+        "GOBP_POSITIVE_REGULATION_OF_NEUROTRANSMITTER_SECRETION",
+        "GOBP_POSITIVE_REGULATION_OF_NEUROTRANSMITTER_TRANSPORT",
+        "GOBP_POSITIVE_REGULATION_OF_NEUROTRANSMITTER_UPTAKE",
+        "GOBP_REGULATION_OF_CALCIUM_ION_DEPENDENT_EXOCYTOSIS_OF_NEUROTRANSMITTER",
+        "GOBP_REGULATION_OF_NEUROTRANSMITTER_RECEPTOR_ACTIVITY",
+        "GOBP_REGULATION_OF_NEUROTRANSMITTER_RECEPTOR_LOCALIZATION_TO_POSTSYNAPTIC_SPECIALIZATION_MEMBRANE",
+        "GOBP_REGULATION_OF_NEUROTRANSMITTER_SECRETION",
+        "GOBP_REGULATION_OF_NEUROTRANSMITTER_TRANSPORT",
+        "GOBP_REGULATION_OF_NEUROTRANSMITTER_UPTAKE",
+        "GOBP_REGULATION_OF_POSTSYNAPTIC_MEMBRANE_NEUROTRANSMITTER_RECEPTOR_LEVELS",
+        "GOBP_REGULTION_OF_POSTSYNAPTIC_NEUROTRANSMITTER_RECEPTOR_INTERNALIZATION",
+        "GOBP_SPONTANEOUS_NEUROTRANSMITTER_SECRETION",
+        "GOBP_CENTRAL_NERVOUS_SYSTEM_MYELIN_FORMATION",
+        "GOBP_CENTRAL_NERVOUS_SYSTEM_MYELIN_MAINTENANCE",
+        "GOBP_MYELIN_ASSEMBLY",
+        "GOBP_MYELIN_MAINTENANCE",
+        "GOBP_NEGATIVE_REGULATION_OF_MYELINATION",
+        "GOBP_PERIPHERAL_NERVOUS_SYSTEM_MYELIN_MAINTENANCE",
+        "GOBP_POSITIVE_REGULATION_OF_MYELINATION",
+        "GOBP_REGULATION_MYELINATION",
+        "GOBP_SPHINGOMYELIN_BIOSYNTHETIC_PROCESS",
+        "GOBP_SPHINGOMYELIN_CATABOLIC_PROCESS",
+        "GOBP_SPHINGOMYELIN_METABOLIC_PROCESS",
+    ]
 
 
 if not os.path.exists("snp.txt") and not os.path.exists(
@@ -224,25 +186,15 @@ for fileName in os.listdir("output"):
     if (
         fileName.startswith("impacted-genes-")
         and fileName.endswith(".txt")
-        and not os.path.exists(f"output/gene-data-{fileName}")
+        and not os.path.exists(f"output/list-{fileName}")
     ):
         print(f"Finding gene data in file: {fileName}")
         findGeneData(fileName)
-# for fileName in os.listdir("output"):
-#    if (
-#        fileName.startswith("gene-data-")
-#        and fileName.endswith(".txt")
-#        and not os.path.exists(f"output/diffGenes-{fileName}")
-#    ):
-#        print(f"Checking brain relation for file: {fileName}")
-#        if os.path.exists(f"saves/{fileName}.txt"):
-#            checkBrainRelation(fileName, save=True)
-#        else:
-#            checkBrainRelation(fileName)
 for fileName in os.listdir("output"):
     if (
-        fileName.startswith("gene-data-")
+        fileName.startswith("list-impacted-genes-")
         and fileName.endswith(".txt")
-        and not os.path.exists(f"output/list-{fileName}")
+        and not os.path.exists(f"output/brain-genes-{fileName}")
     ):
-        convertGeneDataToList(fileName)
+        print(f"Identifying brain genes in file: {fileName}")
+        identifyBrainGenes(fileName)
