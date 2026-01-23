@@ -309,6 +309,36 @@ def identifyBrainGenes(fileName: str):
         "GOBP_SYNAPSE_PRUNING",
         "GOBP_VESICLE_MEDIATED_TRANSPORT_IN_SYNAPSE",
     ]
+    mainCategories = ["Neurotransmitter", "Myelin", "Neuron", "Synapse"]
+    brainProcesses = {}
+    with open("processes.gmt") as processFile:
+        reader = csv.reader(processFile, delimiter="\t")
+        for row in reader:
+            processName = row[0]
+            if processName in brainCategories:
+                genes = row[2:] # Skip process name and URL
+                brainProcesses[processName] = genes
+    impactedBrainGenes = {}
+    genes = set()
+    for gene in brainGenes:
+        for process in brainProcesses:
+            if gene in brainProcesses[process]:
+                mainCategory = None
+                for category in mainCategories:
+                    if process.find(category.upper()) != -1:
+                        mainCategory = category
+                        break
+                if mainCategory is None:
+                    continue
+                currentGeneList = impactedBrainGenes.get(mainCategory, [])
+                if gene not in currentGeneList:
+                    genes.add(gene)
+                    impactedBrainGenes[mainCategory] = impactedBrainGenes.get(
+                        mainCategory, []
+                    ) + [gene]
+    print(f"Found {len(genes)} genes related to brain processes.")
+    with open(f"output/brain-genes-{fileName}", "w") as outputFile:
+        json.dump(impactedBrainGenes, outputFile)
 
 
 if not os.path.exists("snp.txt") and not os.path.exists(
