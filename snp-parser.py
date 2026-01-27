@@ -341,6 +341,18 @@ def identifyBrainGenes(fileName: str):
         json.dump(impactedBrainGenes, outputFile)
 
 
+def formatBrainGeneFileToTSV(fileName: str):
+    with open(f"output/{fileName}") as geneFile:
+        data = json.load(geneFile)
+        with open(f"output/tsv-{fileName.replace('.txt', '.tsv')}", "w") as tsvFile:
+            tsvFile.write("Category\tGene1\tGene2\tGene3\t...\n")
+            for category in data:
+                tsvFile.write(category)
+                for gene in data[category]:
+                    tsvFile.write(f"\t{gene}")
+                tsvFile.write("\n")
+
+
 if not os.path.exists("snp.txt") and not os.path.exists(
     "gene.txt"
 ):  # Skip if already done to save time
@@ -374,9 +386,18 @@ for fileName in os.listdir("output"):
     if fileName.startswith("brain-genes-list-impacted-genes-") and fileName.endswith(
         ".txt"
     ):
+        fileGenes = set()
         with open(f"output/{fileName}") as brainGeneFile:
             data = json.load(brainGeneFile)
             for category in data:
                 for gene in data[category]:
                     finalGenes.add(gene)
+                    fileGenes.add(gene)
+        print(f"File {fileName} has {len(fileGenes)} unique brain-related genes.")
 print(f"Total unique brain-related genes: {len(finalGenes)}")
+for fileName in os.listdir("output"):
+    if fileName.startswith("brain-genes-") and fileName.endswith(".txt") and not os.path.exists(
+        f"output/tsv-{fileName.replace('.txt', '.tsv')}"
+    ):
+        print(f"Formatting brain gene file to TSV: {fileName}")
+        formatBrainGeneFileToTSV(fileName)
