@@ -369,3 +369,14 @@ for fileName in os.listdir("output"):
     ):
         print(f"Identifying brain genes in file: {fileName}")
         identifyBrainGenes(fileName)
+finalGenes = set()
+for fileName in os.listdir("output"):
+    if fileName.startswith("brain-genes-list-impacted-genes-") and fileName.endswith(
+        ".txt"
+    ):
+        with open(f"output/{fileName}") as brainGeneFile:
+            data = json.load(brainGeneFile)
+            for category in data:
+                for gene in data[category]:
+                    finalGenes.add(gene)
+print(f"Total unique brain-related genes: {len(finalGenes)}")
