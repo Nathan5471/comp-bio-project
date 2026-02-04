@@ -1,6 +1,8 @@
 import csv
 import os
 import json
+from openpyxl import Workbook
+from openpyxl.styles import PatternFill, Font
 
 
 def parseSnpFile():
@@ -353,6 +355,134 @@ def formatBrainGeneFileToTSV(fileName: str):
                 tsvFile.write("\n")
 
 
+def outputGenesInExcel():
+    geneDict = {"Neurotransmitter": {}, "Myelin": {}, "Neuron": {}, "Synapse": {}}  # Dictionary hold genes by category and keeps track of the regions of each gene.
+
+    for fileName in os.listdir("output"):
+        if fileName.startswith("brain-genes-") and fileName.endswith(".txt"):
+            with open(f"output/{fileName}") as geneFile:
+                data = json.load(geneFile)
+                for category in data:
+                    for gene in data[category]:
+                        geneDict[category][gene] = geneDict[category].get(gene, set())
+                        geneDict[category][gene].add(fileName)  # Track which files each gene
+
+    wb = Workbook()
+    ws = wb.active
+    currentRow = 2
+    grayColor = "#E6E6E6"  # Light Gray
+    # Add gray border
+    for col in range(1, 26):  # Columns A to Y
+        for row in range(1, 19):
+            cell = ws.cell(row=row, column=col)
+            cell.fill = PatternFill(patternType="solid", fgColor=grayColor.replace("#", ""))
+    # Change column width for non gene columns
+    ws.column_dimensions["A"].width = 16
+    ws.column_dimensions["X"].width = 15
+    ws.column_dimensions["Y"].width = 5
+
+    hippocampusColor = "#B0C4DE"  # Light Steel Blue
+    caudateColor = "#B5CEB4"  # Calm Green
+    nacColor = "#B3A5CC"  # Pastel Purple
+    putamenColor = "#FEC0CB"  # Pink Fraud
+    dlpfcColor = "#FFFDD0"  # Cream
+    multipleRegionsColor = "#FAD6A5"  # Champagne
+    for category in geneDict:
+        currentColumn = "A"
+        ws[f"{currentColumn}{currentRow}"] = category
+        ws[f"{currentColumn}{currentRow}"].font = Font(bold=True)
+        currentColumn = "B"
+        hippocampusGenes = []
+        caudateGenes = []
+        nacGenes = []
+        putamenGenes = []
+        dlpfcGenes = []
+        multipleRegionGenes = []
+        for gene in geneDict[category]:
+            regions = geneDict[category][gene]
+            if len(regions) > 1:
+                multipleRegionGenes.append(gene)
+            elif "brain-genes-list-impacted-genes-GSE138082HippocampusDrugOff.tsv.txt" in regions:
+                hippocampusGenes.append(gene)
+            elif "brain-genes-list-impacted-genes-GSE202537Caudate.tsv.txt" in regions:
+                caudateGenes.append(gene)
+            elif "brain-genes-list-impacted-genes-GSE202537Nac.tsv.txt" in regions:
+                nacGenes.append(gene)
+            elif "brain-genes-list-impacted-genes-GSE202537Putamen.tsv.txt" in regions:
+                putamenGenes.append(gene)
+            elif "brain-genes-list-impacted-genes-GSE224683DLPFC.tsv.txt" in regions:
+                dlpfcGenes.append(gene)
+
+        for gene in hippocampusGenes:
+            if currentColumn == "W":
+                currentColumn = "B" # Keep space in A for category labels
+                currentRow += 1
+            cell = f"{currentColumn}{currentRow}"
+            cellColor = hippocampusColor.replace("#", "")
+            ws[cell] = gene
+            ws[cell].fill = PatternFill(patternType="solid", fgColor=cellColor)
+            currentColumn = chr(ord(currentColumn) + 1)
+        for gene in caudateGenes:
+            if currentColumn == "W":
+                currentColumn = "B" # Keep space in A for category labels
+                currentRow += 1
+            cell = f"{currentColumn}{currentRow}"
+            cellColor = caudateColor.replace("#", "")
+            ws[cell] = gene
+            ws[cell].fill = PatternFill(patternType="solid", fgColor=cellColor)
+            currentColumn = chr(ord(currentColumn) + 1)
+        for gene in nacGenes:
+            if currentColumn == "W":
+                currentColumn = "B" # Keep space in A for category labels
+                currentRow += 1
+            cell = f"{currentColumn}{currentRow}"
+            cellColor = nacColor.replace("#", "")
+            ws[cell] = gene
+            ws[cell].fill = PatternFill(patternType="solid", fgColor=cellColor)
+            currentColumn = chr(ord(currentColumn) + 1)
+        for gene in putamenGenes:
+            if currentColumn == "W":
+                currentColumn = "B" # Keep space in A for category labels
+                currentRow += 1
+            cell = f"{currentColumn}{currentRow}"
+            cellColor = putamenColor.replace("#", "")
+            ws[cell] = gene
+            ws[cell].fill = PatternFill(patternType="solid", fgColor=cellColor)
+            currentColumn = chr(ord(currentColumn) + 1)
+        for gene in dlpfcGenes:
+            if currentColumn == "W":
+                currentColumn = "B" # Keep space in A for category labels
+                currentRow += 1
+            cell = f"{currentColumn}{currentRow}"
+            cellColor = dlpfcColor.replace("#", "")
+            ws[cell] = gene
+            ws[cell].fill = PatternFill(patternType="solid", fgColor=cellColor)
+            currentColumn = chr(ord(currentColumn) + 1)
+        for gene in multipleRegionGenes:
+            if currentColumn == "W":
+                currentColumn = "B" # Keep space in A for category labels
+                currentRow += 1
+            cell = f"{currentColumn}{currentRow}"
+            cellColor = multipleRegionsColor.replace("#", "")
+            ws[cell] = gene
+            ws[cell].fill = PatternFill(patternType="solid", fgColor=cellColor)
+            currentColumn = chr(ord(currentColumn) + 1)
+        currentRow += 1
+    ws["X3"].value = "Hippocampus"
+    ws["X3"].fill = PatternFill(patternType="solid", fgColor=hippocampusColor.replace("#", ""))
+    ws["X4"].value = "Caudate"
+    ws["X4"].fill = PatternFill(patternType="solid", fgColor=caudateColor.replace("#", ""))
+    ws["X5"].value = "NAC"
+    ws["X5"].fill = PatternFill(patternType="solid", fgColor=nacColor.replace("#", ""))
+    ws["X6"].value = "Putamen"
+    ws["X6"].fill = PatternFill(patternType="solid", fgColor=putamenColor.replace("#", ""))
+    ws["X7"].value = "DLPFC"
+    ws["X7"].fill = PatternFill(patternType="solid", fgColor=dlpfcColor.replace("#", ""))
+    ws["X8"].value = "Multiple Regions"
+    ws["X8"].fill = PatternFill(patternType="solid", fgColor=multipleRegionsColor.replace("#", ""))
+    wb.save("output/brain_genes.xlsx")
+
+
 if not os.path.exists("snp.txt") and not os.path.exists(
     "gene.txt"
 ):  # Skip if already done to save time
@@ -401,3 +531,5 @@ for fileName in os.listdir("output"):
     ):
         print(f"Formatting brain gene file to TSV: {fileName}")
         formatBrainGeneFileToTSV(fileName)
+if not os.path.exists("output/brain_genes.xlsx"):
+    outputGenesInExcel()
